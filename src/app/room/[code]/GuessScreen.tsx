@@ -34,6 +34,12 @@ export default function GuessScreen({
         <h1 className="font-display text-2xl font-semibold text-foam">
           ชาวประมงกำลังไล่จับ…
         </h1>
+        <p className="text-sm text-mist">
+          🎣 ชาวประมงคือ{" "}
+          <span className="font-display font-semibold text-lantern">
+            {room.players.find((p) => p.id === room.fishermanId)?.name ?? "?"}
+          </span>
+        </p>
         <p className="max-w-[260px] text-sm text-mist">
           {role?.role === "BLUE"
             ? "คุณคือปลาฟ้า — ถ้าชาวประมงเผลอเลือกคุณ เขาเสียแต้มทั้งรอบ!"

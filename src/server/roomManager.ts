@@ -102,6 +102,7 @@ export function toPublicRoom(room: Room): PublicRoom {
     deadline: room.deadline,
     caughtIds: room.round?.caught ?? [],
     reveal: room.reveal,
+    fishermanId: room.round ? playerIdByRole(room.round, "FISHERMAN") || null : null,
     settings: room.settings,
     questionCount: room.questions.length,
     history: room.history,
@@ -293,7 +294,8 @@ export function rolePayloadFor(room: Room, playerId: string): RolePayload | null
   return {
     role,
     prompt: hideFromFisherman ? null : room.round.prompt,
-    answer: role === "BLUE" ? room.round.answer : null,
+    // ปลาทุกตัว (ฟ้า+แดง) เห็นคำตอบจริง — ชาวประมงไม่เห็น
+    answer: role === "FISHERMAN" ? null : room.round.answer,
   };
 }
 

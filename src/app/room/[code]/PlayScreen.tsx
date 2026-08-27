@@ -34,6 +34,9 @@ export default function PlayScreen({
   const skipReading = () => getSocket().emit("game:skipReading");
   const skipDiscussion = () => getSocket().emit("game:skipDiscussion");
 
+  const fishermanName =
+    room.players.find((p) => p.id === room.fishermanId)?.name ?? "";
+
   const RoleBadge = (
     <span
       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 font-display text-sm font-semibold ${meta.color} ${meta.ring}`}
@@ -41,6 +44,13 @@ export default function PlayScreen({
       {meta.emoji} {meta.label}
     </span>
   );
+
+  const FishermanLine = fishermanName ? (
+    <p className="mt-3 text-center text-sm text-mist">
+      🎣 ชาวประมงรอบนี้คือ{" "}
+      <span className="font-display font-semibold text-lantern">{fishermanName}</span>
+    </p>
+  ) : null;
 
   if (room.phase === "READING") {
     return (
@@ -54,6 +64,8 @@ export default function PlayScreen({
           </div>
         </div>
 
+        {FishermanLine}
+
         <div className="mt-5 rounded-2xl border border-kelp bg-surface p-5">
           <p className="text-xs uppercase tracking-widest text-mist-dim">คำถามประจำรอบ</p>
           {role.prompt ? (
@@ -64,10 +76,10 @@ export default function PlayScreen({
             </p>
           )}
 
-          {role.role === "BLUE" && role.answer && (
+          {(role.role === "BLUE" || role.role === "RED") && role.answer && (
             <div className="mt-4 rounded-xl border border-dashed border-bluefish/60 bg-bluefish/10 p-4">
               <p className="text-xs uppercase tracking-widest text-bluefish">
-                คำตอบจริง — เห็นเฉพาะคุณ
+                คำตอบจริง — ชาวประมงไม่เห็น
               </p>
               <p className="font-display mt-1 text-lg font-semibold text-bluefish">
                 {role.answer}
@@ -78,10 +90,10 @@ export default function PlayScreen({
 
         <div className="mt-4 rounded-xl border border-kelp bg-white/5 p-4 text-sm leading-relaxed text-mist">
           {role.role === "BLUE"
-            ? "🤫 คุณรู้คำตอบจริง! เนียน ๆ ไว้ อย่าให้ชาวประมงจับได้ว่าคุณคือปลาฟ้า"
+            ? "🐟 คุณคือปลาฟ้า! ถ้าชาวประมงเผลอจับคุณ = โป๊ะแตก (เขาเสียแต้มทั้งรอบ) เนียน ๆ ไว้"
             : role.role === "RED"
-              ? "🎭 คุณไม่รู้คำตอบจริง — แต่งคำตอบปลอมให้เนียน แล้วทำเป็นมั่นใจ"
-              : "👀 มีปลาฟ้าซ่อนอยู่ 1 ตัวที่รู้คำตอบจริง จับตาดูให้ดี"}
+              ? "🐡 คุณรู้คำตอบจริง — คุยให้เนียน อย่าให้ชาวประมงจับ (ถูกจับ = 0 แต้ม)"
+              : "👀 ทุกตัวรู้คำตอบเหมือนกัน — จับปลาแดงให้ได้เยอะ แต่เลี่ยงปลาฟ้า (โดนแล้วโป๊ะแตก)"}
         </div>
 
         <div className="flex-1" />
@@ -113,6 +125,8 @@ export default function PlayScreen({
           <Countdown deadline={room.deadline} />
         </div>
       </div>
+
+      {FishermanLine}
 
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
         <div className="text-5xl">🗣️</div>

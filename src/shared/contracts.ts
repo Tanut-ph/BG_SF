@@ -67,6 +67,8 @@ export interface PublicRoom {
   caughtIds: string[];
   /** ผลเฉลย — มีค่าเฉพาะ phase REVEAL */
   reveal: RevealResult | null;
+  /** playerId ของชาวประมงรอบปัจจุบัน (เปิดเผยให้ทุกคนรู้) — null ตอนอยู่ห้องรอ */
+  fishermanId: string | null;
   settings: RoomSettings;
   questionCount: number; // จำนวนคำถามในคลัง (ตัวคำถามจริงส่งเฉพาะโฮสต์)
   history: RoundSummary[];
