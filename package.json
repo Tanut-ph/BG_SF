@@ -1,0 +1,33 @@
+{
+  "name": "sf-game",
+  "version": "0.1.0",
+  "private": true,
+  "description": "โป๊ะแตก — เว็บเกมแนว Bluff เล่นต่อหน้ากัน (มือถือเป็นตัวช่วย)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/server/index.ts",
+    "build": "next build",
+    "start": "cross-env NODE_ENV=production tsx src/server/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "cross-env": "^7.0.3",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

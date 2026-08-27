@@ -1,0 +1,19 @@
+# Fly.io — deploy โป๊ะแตก (รองรับ WebSocket ผ่าน http_service)
+# ใช้: flyctl launch (ครั้งแรก) แล้ว flyctl deploy
+app = "popbaek"
+primary_region = "sin"  # สิงคโปร์ (ใกล้ไทย) — เปลี่ยนได้
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # state อยู่ในหน่วยความจำ → รัน 1 instance เท่านั้น (อย่าปิดเครื่องอัตโนมัติกลางเกม)
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

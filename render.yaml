@@ -1,0 +1,14 @@
+# Render.com blueprint — deploy โป๊ะแตกเป็น web service (รองรับ WebSocket)
+# ใช้: เชื่อม repo กับ Render แล้วเลือก "Blueprint" หรือใช้ไฟล์นี้อัตโนมัติ
+services:
+  - type: web
+    name: popbaek
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    # Render กำหนด PORT ให้เอง (server อ่านจาก process.env.PORT)
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /

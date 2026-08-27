@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-plex-thai), system-ui, sans-serif;
+  color: #eaf5fa;
+  background:
+    radial-gradient(1200px 700px at 20% -10%, #123655 0%, transparent 55%),
+    radial-gradient(900px 600px at 90% 0%, #0f2c47 0%, transparent 50%),
+    linear-gradient(180deg, #0a1a2b 0%, #060f1a 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* utility เล็ก ๆ สำหรับหัวข้อฟอนต์ display */
+.font-display {
+  font-family: var(--font-mitr), sans-serif;
+}
