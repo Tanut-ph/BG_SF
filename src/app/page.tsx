@@ -1,12 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { HowToPlay } from "@/components/HowToPlay";
 
 export default function Home() {
   const router = useRouter();
   const [code, setCode] = useState("");
+  const [showHow, setShowHow] = useState(false);
+  const [kicked, setKicked] = useState(false);
   const canJoin = /^\d{4}$/.test(code);
+
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("kicked") === "1") {
+        setKicked(true);
+      }
+    } catch {
+      /* noop */
+    }
+  }, []);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-16">
@@ -16,7 +29,13 @@ export default function Home() {
         <p className="mt-1 text-sm text-mist">จับปลาโกหกในวงเพื่อน 3–10 คน</p>
       </div>
 
-      <div className="mt-10 flex flex-col gap-4">
+      {kicked && (
+        <div className="mt-6 rounded-xl border border-redfish/50 bg-redfish/10 px-4 py-3 text-center text-sm text-foam">
+          คุณถูกเตะออกจากห้อง — เข้าใหม่ด้วยรหัสห้องได้เลย
+        </div>
+      )}
+
+      <div className="mt-8 flex flex-col gap-4">
         <button
           onClick={() => router.push("/join?mode=create")}
           className="font-display w-full rounded-2xl bg-bluefish px-4 py-4 text-lg font-semibold text-abyss shadow-lg shadow-bluefish/30 transition active:scale-[.99]"
@@ -46,6 +65,17 @@ export default function Home() {
           เข้าห้อง
         </button>
       </div>
+
+      <div className="flex-1" />
+
+      <button
+        onClick={() => setShowHow(true)}
+        className="font-display mx-auto mt-8 rounded-full border border-kelp bg-surface px-5 py-2.5 text-sm text-foam"
+      >
+        📖 วิธีเล่น
+      </button>
+
+      {showHow && <HowToPlay onClose={() => setShowHow(false)} />}
     </main>
   );
 }

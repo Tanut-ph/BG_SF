@@ -68,7 +68,9 @@ export default function GuessScreen({
         <span className="font-display inline-flex items-center gap-2 rounded-full border border-lantern px-3 py-1.5 text-sm font-semibold text-lantern">
           🎣 ชาวประมง
         </span>
-        <span className="font-display text-sm text-mist">ช่วงทาย</span>
+        <span className="font-display rounded-full border border-kelp bg-surface px-3 py-1 text-xs text-mist">
+          ห้อง <b className="text-foam">{room.code}</b>
+        </span>
       </div>
 
       <div className="mt-4 flex items-center gap-3 rounded-2xl border border-lantern/40 bg-lantern/10 px-4 py-3">

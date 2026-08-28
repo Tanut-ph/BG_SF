@@ -66,6 +66,7 @@ export interface Room {
   settings: RoomSettings;
   questions: Question[];
   history: RoundSummary[];
+  scoreboard: Map<string, number>; // name -> คะแนนสะสมข้ามเกม
   roundNo: number;
   createdAt: number;
 }
@@ -106,6 +107,9 @@ export function toPublicRoom(room: Room): PublicRoom {
     settings: room.settings,
     questionCount: room.questions.length,
     history: room.history,
+    scoreboard: [...room.scoreboard.entries()]
+      .map(([name, score]) => ({ name, score }))
+      .sort((a, b) => b.score - a.score),
     players: [...room.players.values()].map((p) => ({
       id: p.id,
       name: p.name,
@@ -145,6 +149,7 @@ export function createRoom(name: string, avatar: string, socketId: string) {
     settings: defaultSettings(),
     questions: [...QUESTIONS],
     history: [],
+    scoreboard: new Map(),
     roundNo: 0,
     createdAt: Date.now(),
   };
@@ -232,7 +237,7 @@ export function leaveRoom(socketId: string): Room | null {
   return room;
 }
 
-/** หลุดการเชื่อมต่อ (จอล็อก/เน็ตหลุด) — คงที่นั่งไว้ให้ rejoin ได้ */
+/** หลุดการเชื่อมต่อ (จอล็อก/เน็ตหลุด) — คงที่นั่งไว้ก่อน (ให้ rejoin/ลบทีหลังด้วย grace) */
 export function markDisconnected(socketId: string): Room | null {
   const at = socketIndex.get(socketId);
   if (!at) return null;
@@ -243,6 +248,40 @@ export function markDisconnected(socketId: string): Room | null {
   if (player) {
     player.connected = false;
     player.socketId = null;
+  }
+  return room;
+}
+
+/** โฮสต์เตะผู้เล่นออก — คืน socketId ของคนที่ถูกเตะ (เพื่อแจ้ง/ตัดการเชื่อมต่อ) */
+export function kickPlayer(
+  room: Room,
+  targetId: string
+): { room: Room; kickedSocketId: string | null } | { error: string } {
+  if (targetId === room.hostId) return { error: "เตะโฮสต์ไม่ได้" };
+  const target = room.players.get(targetId);
+  if (!target) return { error: "ไม่พบผู้เล่น" };
+  const kickedSocketId = target.socketId;
+  room.players.delete(targetId);
+  if (kickedSocketId) socketIndex.delete(kickedSocketId);
+  return { room, kickedSocketId };
+}
+
+/** ลบผู้เล่นที่หลุดออกถาวร (หลังหมด grace แล้วยังไม่กลับ) — คืนห้อง (null ถ้าห้องถูกลบ) */
+export function removeIfStillDisconnected(code: string, playerId: string): Room | null {
+  const room = rooms.get(code);
+  if (!room) return null;
+  const player = room.players.get(playerId);
+  if (!player || player.connected) return null; // กลับมาแล้ว — ไม่ลบ
+  room.players.delete(playerId);
+  if (room.players.size === 0) {
+    rooms.delete(code);
+    return null;
+  }
+  if (room.hostId === playerId) {
+    const next =
+      [...room.players.values()].find((p) => p.connected) ??
+      [...room.players.values()][0];
+    room.hostId = next.id;
   }
   return room;
 }
@@ -299,11 +338,11 @@ export function rolePayloadFor(room: Room, playerId: string): RolePayload | null
   };
 }
 
-/** หมดเวลาอ่านโจทย์ → เข้าสู่ช่วงคุยกัน (มี timer) */
+/** หมดเวลาอ่านโจทย์ → เข้าสู่ช่วงคุยกัน (ไม่จับเวลา — โฮสต์คุมจังหวะเอง) */
 export function endReading(room: Room): boolean {
   if (room.phase !== "READING") return false;
   room.phase = "DISCUSSION";
-  room.deadline = Date.now() + room.settings.discussionSeconds * 1000;
+  room.deadline = null;
   return true;
 }
 
@@ -348,12 +387,15 @@ export function pickGuess(
 
 /**
  * จบรอบและคิดคะแนน (หลัก "ปลาที่รอดได้คนละ = จำนวนตัวที่รอด")
- * - bank: ชาวประมง +1 ต่อปลาแดงที่จับได้
- * - bust: ชาวประมง 0
- * - ปลาที่รอด (ปลาฟ้า + ปลาแดงที่ยังไม่ถูกจับ) ได้คนละ = จำนวนปลาที่รอด
- * - ปลาแดงที่ถูกจับ = 0
+ * - bank: กดจบเอง → ชาวประมง +1/ปลาแดงที่จับได้ · ปลาฟ้ารอด
+ * - bust: โดนปลาฟ้าทั้งที่ยังมีปลาแดงเหลือ → ชาวประมง 0 · ปลาฟ้ารอด
+ * - sweep: จับปลาฟ้าเป็นตัวสุดท้าย (จับแดงครบแล้ว) → ชาวประมง +1/ปลาแดง · ไม่มีใครรอด (ปลาฟ้าไม่ได้แต้ม)
+ * - ปลาที่รอด (ที่ยังไม่ถูกจับ) ได้คนละ = จำนวนปลาที่รอด · ปลาแดงที่ถูกจับ = 0
  */
-export function finishRound(room: Room, outcome: "bust" | "bank"): RevealResult | null {
+export function finishRound(
+  room: Room,
+  outcome: "bust" | "bank" | "sweep"
+): RevealResult | null {
   const round = room.round;
   if (!round) return null;
 
@@ -361,20 +403,26 @@ export function finishRound(room: Room, outcome: "bust" | "bank"): RevealResult 
   const fishermanId = playerIdByRole(round, "FISHERMAN");
   const blueId = playerIdByRole(round, "BLUE");
 
-  // fish = ผู้เล่นที่ไม่ใช่ชาวประมง; ปลาที่รอด = fish ที่ไม่ถูกจับ (ปลาฟ้าถือว่ารอดเสมอ)
   const fishIds = players
     .map((p) => p.id)
     .filter((id) => roleOf(round, id) !== "FISHERMAN");
-  const aliveFish = fishIds.filter((id) => !round.caught.includes(id));
+  const uncaught = fishIds.filter((id) => !round.caught.includes(id));
+  // sweep: ปลาฟ้าถูกจับปิดท้าย → ไม่นับเป็นรอด
+  const blueSurvives = outcome !== "sweep";
+  const aliveFish = uncaught.filter((id) => blueSurvives || id !== blueId);
   const A = aliveFish.length;
 
   const roundPoints: Record<string, number> = {};
   for (const p of players) roundPoints[p.id] = 0;
   for (const id of aliveFish) roundPoints[id] = A;
-  roundPoints[fishermanId] = outcome === "bank" ? round.caught.length : 0;
+  roundPoints[fishermanId] = outcome === "bust" ? 0 : round.caught.length;
 
-  // สะสมคะแนน
-  for (const p of players) p.score += roundPoints[p.id] ?? 0;
+  // สะสมคะแนน: ต่อผู้เล่น (session) + ต่อชื่อ (ข้ามเกม)
+  for (const p of players) {
+    const gained = roundPoints[p.id] ?? 0;
+    p.score += gained;
+    room.scoreboard.set(p.name, (room.scoreboard.get(p.name) ?? 0) + gained);
+  }
 
   const roles: Record<string, Role> = {};
   for (const [id, r] of round.roles) roles[id] = r;

@@ -39,7 +39,7 @@ export interface RoomSettings {
 /** สรุปผลแต่ละรอบ (สำหรับหน้าประวัติ) */
 export interface RoundSummary {
   round: number;
-  outcome: "bust" | "bank";
+  outcome: "bust" | "bank" | "sweep";
   caughtCount: number;
   fishermanName: string;
   blueName: string;
@@ -72,11 +72,14 @@ export interface PublicRoom {
   settings: RoomSettings;
   questionCount: number; // จำนวนคำถามในคลัง (ตัวคำถามจริงส่งเฉพาะโฮสต์)
   history: RoundSummary[];
+  /** คะแนนสะสมต่อชื่อ (ข้ามหลายเกม) เรียงมาก→น้อย */
+  scoreboard: { name: string; score: number }[];
 }
 
 /** ผลเฉลยตอนจบรอบ (เปิดเผยทั้งหมด — round จบแล้ว) */
 export interface RevealResult {
-  outcome: "bust" | "bank"; // โดนปลาฟ้า / กดจบเอง
+  // โดนปลาฟ้า(ยังมีแดงเหลือ) / กดจบเอง / จับปลาฟ้าเป็นตัวสุดท้าย(กวาดเรียบ)
+  outcome: "bust" | "bank" | "sweep";
   fishermanId: string;
   blueId: string;
   answer: string;
@@ -165,6 +168,11 @@ export interface ClientToServerEvents {
   ) => void;
   /** โฮสต์ยกเลิกรอบปัจจุบัน กลับห้องรอ (คงคะแนน/ประวัติไว้) */
   "game:abort": (ack?: (res: Result<null>) => void) => void;
+  /** โฮสต์เตะผู้เล่นออกจากห้อง */
+  "player:kick": (
+    payload: { targetId: string },
+    ack?: (res: Result<null>) => void
+  ) => void;
 }
 
 /** event ที่ server ส่งมาหา client */
@@ -174,6 +182,8 @@ export interface ServerToClientEvents {
   "role:assigned": (payload: RolePayload) => void;
   /** ข้อความแจ้งเตือนชั่วคราว (เช่น รอบถูกยกเลิก) */
   "room:notice": (message: string) => void;
+  /** ผู้เล่นถูกเตะออก — client เด้งกลับหน้าแรก */
+  "room:kicked": (reason: string) => void;
 }
 
 /** ข้อมูลที่ผูกกับแต่ละ socket ฝั่ง server (เก็บใน socket.data) */

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MIN_PLAYERS, type PublicRoom } from "@/shared/contracts";
 import { getSocket } from "@/lib/socket";
+import { HowToPlay } from "@/components/HowToPlay";
 
 export default function Lobby({
   room,
@@ -19,6 +20,7 @@ export default function Lobby({
 }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [showHow, setShowHow] = useState(false);
 
   const isHost = room.hostId === playerId;
   const me = room.players.find((p) => p.id === playerId);
@@ -38,6 +40,7 @@ export default function Lobby({
   };
 
   const toggleReady = () => getSocket().emit("player:ready", { ready: !me?.ready });
+  const kick = (targetId: string) => getSocket().emit("player:kick", { targetId });
 
   const start = () => {
     setError("");
@@ -51,10 +54,12 @@ export default function Lobby({
       <div className="flex items-center justify-between">
         <span className="font-display text-sm text-mist">ห้องรอ</span>
         <div className="flex items-center gap-3 text-sm text-mist-dim">
+          <button onClick={() => setShowHow(true)}>📖 วิธีเล่น</button>
           <button onClick={onOpenHistory}>🏆 ประวัติ</button>
           <button onClick={onLeave}>ออกจากห้อง</button>
         </div>
       </div>
+      {showHow && <HowToPlay onClose={() => setShowHow(false)} />}
 
       <div className="mt-4 rounded-2xl border border-kelp bg-surface/70 p-5 text-center">
         <p className="text-xs uppercase tracking-widest text-mist-dim">
@@ -97,6 +102,16 @@ export default function Lobby({
                 <span className="text-mist-dim">ยังไม่พร้อม</span>
               )}
             </span>
+            {isHost && !p.isHost && (
+              <button
+                onClick={() => kick(p.id)}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-kelp text-redfish hover:bg-redfish/10"
+                aria-label={`เตะ ${p.name}`}
+                title="เตะออกจากห้อง"
+              >
+                ✕
+              </button>
+            )}
           </li>
         ))}
       </ul>

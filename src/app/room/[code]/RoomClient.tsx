@@ -51,10 +51,15 @@ export default function RoomClient({ code }: { code: string }) {
       setNotice(msg);
       window.setTimeout(() => setNotice(""), 4000);
     };
+    const onKicked = () => {
+      clearIdentity(code);
+      router.replace("/?kicked=1");
+    };
 
     socket.on("room:updated", onUpdated);
     socket.on("role:assigned", onRole);
     socket.on("room:notice", onNotice);
+    socket.on("room:kicked", onKicked);
     socket.on("connect", doRejoin);
     doRejoin();
 
@@ -62,6 +67,7 @@ export default function RoomClient({ code }: { code: string }) {
       socket.off("room:updated", onUpdated);
       socket.off("role:assigned", onRole);
       socket.off("room:notice", onNotice);
+      socket.off("room:kicked", onKicked);
       socket.off("connect", doRejoin);
     };
   }, [code, router]);

@@ -21,18 +21,23 @@ export default function RevealScreen({
 
   const isHost = room.hostId === playerId;
   const bust = reveal.outcome === "bust";
+  const sweep = reveal.outcome === "sweep";
   const caughtCount = reveal.caughtIds.length;
 
   const byId = new Map(room.players.map((p) => [p.id, p]));
   const blue = byId.get(reveal.blueId);
   const survivors = room.players.filter(
     (p) =>
-      reveal.roles[p.id] !== "FISHERMAN" && !reveal.caughtIds.includes(p.id)
+      reveal.roles[p.id] !== "FISHERMAN" &&
+      !reveal.caughtIds.includes(p.id) &&
+      !(sweep && p.id === reveal.blueId)
   );
 
   const statusOf = (id: string): string => {
     const role = reveal.roles[id];
-    if (role === "FISHERMAN") return bust ? "โป๊ะแตก" : `จับได้ ${caughtCount}`;
+    if (role === "FISHERMAN")
+      return bust ? "โป๊ะแตก" : sweep ? `กวาดเรียบ · จับได้ ${caughtCount}` : `จับได้ ${caughtCount}`;
+    if (sweep && id === reveal.blueId) return "ถูกจับ (ปิดท้าย)";
     if (reveal.caughtIds.includes(id)) return "ถูกจับ";
     return "รอด";
   };
@@ -47,8 +52,10 @@ export default function RevealScreen({
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col px-6 pb-8 pt-12">
       <div className="flex items-center justify-between">
-        <span className="font-display text-sm text-mist">เฉลย</span>
-        <span className="font-display text-sm text-mist">รอบจบแล้ว</span>
+        <span className="font-display rounded-full border border-kelp bg-surface px-3 py-1 text-xs text-mist">
+          ห้อง <b className="text-foam">{room.code}</b>
+        </span>
+        <span className="font-display text-sm text-mist">เฉลย · รอบจบแล้ว</span>
       </div>
 
       {/* verdict */}
@@ -57,19 +64,24 @@ export default function RevealScreen({
           bust ? "border-bluefish/40 bg-bluefish/10" : "border-lantern/40 bg-lantern/10"
         }`}
       >
-        <div className="text-3xl">{bust ? "🫧" : "🎣"}</div>
+        <div className="text-3xl">{bust ? "🫧" : sweep ? "🏆" : "🎣"}</div>
         <p
           className={`font-display mt-1 text-xl font-bold ${
             bust ? "text-bluefish" : "text-lantern"
           }`}
         >
-          {bust ? "โป๊ะแตก! ปลาฟ้าเอาคืน" : "จบการจับ!"}
+          {bust ? "โป๊ะแตก! ปลาฟ้าเอาคืน" : sweep ? "กวาดเรียบ! ชาวประมงได้คนเดียว" : "จบการจับ!"}
         </p>
         <p className="mt-1 text-sm text-mist">
           {bust ? (
             <>
               ชาวประมงจับปลาแดงได้ <b className="text-foam">{caughtCount}</b> ตัว แล้วไปโดน{" "}
               <b className="text-bluefish">ปลาฟ้า “{blue?.name}”</b> — เสียแต้มทั้งรอบเหลือ 0
+            </>
+          ) : sweep ? (
+            <>
+              จับปลาแดงครบแล้วปิดท้ายด้วย <b className="text-bluefish">ปลาฟ้า “{blue?.name}”</b> —
+              ชาวประมงได้ <b className="text-foam">+{caughtCount}</b> คนเดียว ไม่มีปลารอด
             </>
           ) : (
             <>

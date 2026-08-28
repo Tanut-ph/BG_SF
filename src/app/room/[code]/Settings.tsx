@@ -121,16 +121,6 @@ export default function Settings({
         </div>
         <div className="flex items-center gap-3 py-4">
           <div className="flex-1">
-            <div className="font-medium">เวลาคุยกัน</div>
-            <div className="text-xs text-mist-dim">ช่วงพูดคุยก่อนชาวประมงทาย</div>
-          </div>
-          <Stepper
-            value={s.discussionSeconds}
-            onDelta={(d) => update({ discussionSeconds: s.discussionSeconds + d * 10 })}
-          />
-        </div>
-        <div className="flex items-center gap-3 py-4">
-          <div className="flex-1">
             <div className="font-medium">ให้ชาวประมงกดจบเองได้</div>
             <div className="text-xs text-mist-dim">หยุดไล่จับเมื่อไรก็ได้</div>
           </div>

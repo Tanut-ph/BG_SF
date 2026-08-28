@@ -21,10 +21,12 @@ import {
   isValidAvatar,
   isValidCode,
   joinRoom,
+  kickPlayer,
   leaveRoom,
   markDisconnected,
   pickGuess,
   rejoin,
+  removeIfStillDisconnected,
   removeQuestion,
   resetToLobby,
   rolePayloadFor,
@@ -38,6 +40,10 @@ import {
 
 /** timer ของ phase ต่อห้อง (server เป็นเจ้าของเวลา กัน drift/โกง) */
 const phaseTimers = new Map<string, NodeJS.Timeout>();
+/** grace ก่อนลบผู้เล่นที่หลุด (ms) — เผื่อรีเฟรช/จอล็อกแล้วกลับมา */
+const DISCONNECT_GRACE_MS = 8000;
+const graceTimers = new Map<string, NodeJS.Timeout>();
+const graceKey = (code: string, playerId: string) => `${code}:${playerId}`;
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -144,6 +150,11 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
     const result = rejoin(code, token, socket.id);
     if ("error" in result) return ack({ ok: false, error: result.error });
 
+    // กลับมาแล้ว — ยกเลิก grace ที่ตั้งไว้ตอนหลุด
+    const gk = graceKey(code, result.player.id);
+    clearTimeout(graceTimers.get(gk));
+    graceTimers.delete(gk);
+
     bindSocket(socket, code, result.player.id);
     ack({ ok: true, data: { playerId: result.player.id, room: toPublicRoom(result.room) } });
     broadcastRoom(io, result.room);
@@ -187,8 +198,14 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
   });
 
   socket.on("game:skipDiscussion", (ack) => {
-    const room = requireHost(socket);
-    if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
+    // ชาวประมงเป็นคนคุมการเริ่มช่วงทาย (โฮสต์กดได้ด้วยเป็นตัวสำรอง)
+    const code = socket.data.roomCode;
+    const room = code ? getRoom(code) : undefined;
+    if (!room) return ack?.({ ok: false, error: "ไม่พบห้อง" });
+    const pid = socket.data.playerId ?? "";
+    if (room.hostId !== pid && !isFisherman(room, pid)) {
+      return ack?.({ ok: false, error: "เฉพาะชาวประมงเท่านั้น" });
+    }
     clearPhaseTimer(room.code);
     if (endDiscussion(room)) broadcastRoom(io, room);
     ack?.({ ok: true, data: null });
@@ -204,8 +221,13 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
     const result = pickGuess(room, targetId);
     if ("error" in result) return ack?.({ ok: false, error: result.error });
 
-    if (result.bust) {
-      finishRound(room, "bust"); // โดนปลาฟ้า
+    if (result.role === "BLUE") {
+      // จับปลาฟ้า: ถ้ายังมีปลาแดงเหลือ = โป๊ะแตก(bust); ถ้าจับแดงครบแล้ว = กวาดเรียบ(sweep)
+      const round = room.round!;
+      const anyRedUncaught = [...round.roles].some(
+        ([id, r]) => r === "RED" && !round.caught.includes(id)
+      );
+      finishRound(room, anyRedUncaught ? "bust" : "sweep");
     }
     broadcastRoom(io, room);
     ack?.({ ok: true, data: null });
@@ -294,9 +316,51 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
     }
   });
 
+  socket.on("player:kick", ({ targetId }, ack) => {
+    const room = requireHost(socket);
+    if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
+    const result = kickPlayer(room, targetId);
+    if ("error" in result) return ack?.({ ok: false, error: result.error });
+
+    // แจ้งคนที่ถูกเตะ + ดันออกจาก socket room
+    if (result.kickedSocketId) {
+      io.to(result.kickedSocketId).emit("room:kicked", "โฮสต์เตะคุณออกจากห้อง");
+      io.sockets.sockets.get(result.kickedSocketId)?.leave(room.code);
+    }
+    // ถ้าเตะกลางรอบ → ยกเลิกรอบ
+    clearPhaseTimer(room.code);
+    if (abortRound(room)) {
+      io.to(room.code).emit("room:notice", "รอบถูกยกเลิก: โฮสต์เตะผู้เล่นออก");
+    }
+    broadcastRoom(io, room);
+    ack?.({ ok: true, data: null });
+  });
+
   socket.on("disconnect", (reason) => {
+    const code = socket.data.roomCode;
+    const playerId = socket.data.playerId;
     const room = markDisconnected(socket.id);
     if (room) broadcastRoom(io, room);
     console.log(`❌ disconnected: ${socket.id} (${reason})`);
+
+    // grace: ถ้าไม่กลับมาภายในเวลาที่กำหนด → ลบออกถาวร (+ยกเลิกรอบถ้ากลางเกม)
+    if (code && playerId) {
+      const key = graceKey(code, playerId);
+      clearTimeout(graceTimers.get(key));
+      graceTimers.set(
+        key,
+        setTimeout(() => {
+          graceTimers.delete(key);
+          const r = removeIfStillDisconnected(code, playerId);
+          if (r) {
+            clearPhaseTimer(r.code);
+            if (abortRound(r)) {
+              io.to(r.code).emit("room:notice", "รอบถูกยกเลิก: มีผู้เล่นหลุดออก");
+            }
+            broadcastRoom(io, r);
+          }
+        }, DISCONNECT_GRACE_MS)
+      );
+    }
   });
 }
