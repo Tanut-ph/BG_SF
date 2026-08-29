@@ -90,7 +90,10 @@ export default function Lobby({
             <span className="grid h-9 w-9 place-items-center rounded-full border border-kelp bg-abyss-2 text-lg">
               {p.avatar}
             </span>
-            <span className="font-medium text-foam">{p.name}</span>
+            <span className="font-medium text-foam">
+              {p.name}
+              {p.id === playerId && <span className="ml-1 text-xs text-bluefish">(คุณ)</span>}
+            </span>
             <span className="ml-auto font-display text-xs">
               {p.isHost ? (
                 <span className="text-lantern">โฮสต์</span>

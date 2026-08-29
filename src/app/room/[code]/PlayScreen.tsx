@@ -5,14 +5,7 @@ import type { PublicRoom, RolePayload } from "@/shared/contracts";
 import { getSocket } from "@/lib/socket";
 import { Countdown } from "@/components/Countdown";
 import { RoleCard } from "./RoleCard";
-
-function RoomPill({ code }: { code: string }) {
-  return (
-    <span className="font-display rounded-full border border-kelp bg-surface px-3 py-1 text-xs text-mist">
-      ห้อง <b className="text-foam">{code}</b>
-    </span>
-  );
-}
+import { YouBadge } from "./YouBadge";
 
 export default function PlayScreen({
   room,
@@ -51,7 +44,7 @@ export default function PlayScreen({
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col px-6 pb-8 pt-12">
         <div className="flex items-center justify-between">
-          <RoomPill code={room.code} />
+          <YouBadge room={room} playerId={playerId} />
           <div className="grid h-14 w-14 place-items-center rounded-full border-4 border-lantern bg-abyss-2 font-display text-base font-semibold">
             <Countdown deadline={room.deadline} />
           </div>
@@ -86,7 +79,7 @@ export default function PlayScreen({
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col px-6 pb-8 pt-12">
       <div className="flex items-center justify-between">
-        <RoomPill code={room.code} />
+        <YouBadge room={room} playerId={playerId} />
         <span className="font-display text-sm text-mist">🗣️ คุยกัน</span>
       </div>
 

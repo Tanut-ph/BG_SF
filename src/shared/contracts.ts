@@ -54,6 +54,8 @@ export interface PublicPlayer {
   connected: boolean;
   ready: boolean;
   score: number; // คะแนนสะสมข้ามรอบ
+  /** เข้ามาระหว่างรอบ ยังไม่มีบทบาท (รอรอบถัดไป) */
+  spectator: boolean;
 }
 
 export interface PublicRoom {

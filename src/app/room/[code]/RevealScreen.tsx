@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import type { PublicRoom, Role } from "@/shared/contracts";
 import { getSocket } from "@/lib/socket";
+import { addGameRecord } from "@/lib/history";
+import { YouBadge } from "./YouBadge";
 
 const ROLE_TAG: Record<Role, { label: string; cls: string }> = {
   FISHERMAN: { label: "ชาวประมง", cls: "text-lantern bg-lantern/15" },
@@ -17,6 +20,24 @@ export default function RevealScreen({
   playerId: string;
 }) {
   const reveal = room.reveal;
+
+  // บันทึกผลรอบนี้ลงเครื่อง (ครั้งเดียวต่อรอบ) เพื่อโชว์ที่หน้าหลัก
+  useEffect(() => {
+    if (!reveal) return;
+    if (!reveal.roles[playerId]) return; // ผู้ชมรอบนี้ ไม่บันทึก
+    const me = room.players.find((p) => p.id === playerId);
+    if (!me) return;
+    addGameRecord({
+      at: Date.now(),
+      code: room.code,
+      name: me.name,
+      role: ROLE_TAG[reveal.roles[playerId]]?.label ?? "-",
+      points: reveal.roundPoints[playerId] ?? 0,
+    });
+    // เก็บครั้งเดียวตอนเข้า REVEAL — deps ว่างเพื่อไม่บันทึกซ้ำตอน re-render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (!reveal) return null;
 
   const isHost = room.hostId === playerId;
@@ -36,15 +57,15 @@ export default function RevealScreen({
   const statusOf = (id: string): string => {
     const role = reveal.roles[id];
     if (role === "FISHERMAN")
-      return bust ? "โป๊ะแตก" : sweep ? `กวาดเรียบ · จับได้ ${caughtCount}` : `จับได้ ${caughtCount}`;
+      return bust ? "โป๊ะแตก" : sweep ? "กวาดเรียบ · จับครบทุกตัว" : `จับได้ ${caughtCount}`;
     if (sweep && id === reveal.blueId) return "ถูกจับ (ปิดท้าย)";
     if (reveal.caughtIds.includes(id)) return "ถูกจับ";
     return "รอด";
   };
 
-  const rows = [...room.players].sort(
-    (a, b) => (reveal.roundPoints[b.id] ?? 0) - (reveal.roundPoints[a.id] ?? 0)
-  );
+  const rows = room.players
+    .filter((p) => reveal.roles[p.id]) // ตัดผู้ชมที่เข้ามากลางรอบออก
+    .sort((a, b) => (reveal.roundPoints[b.id] ?? 0) - (reveal.roundPoints[a.id] ?? 0));
 
   const nextRound = () => getSocket().emit("game:nextRound");
   const reset = () => getSocket().emit("game:reset");
@@ -52,9 +73,7 @@ export default function RevealScreen({
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col px-6 pb-8 pt-12">
       <div className="flex items-center justify-between">
-        <span className="font-display rounded-full border border-kelp bg-surface px-3 py-1 text-xs text-mist">
-          ห้อง <b className="text-foam">{room.code}</b>
-        </span>
+        <YouBadge room={room} playerId={playerId} />
         <span className="font-display text-sm text-mist">เฉลย · รอบจบแล้ว</span>
       </div>
 
@@ -81,7 +100,7 @@ export default function RevealScreen({
           ) : sweep ? (
             <>
               จับปลาแดงครบแล้วปิดท้ายด้วย <b className="text-bluefish">ปลาฟ้า “{blue?.name}”</b> —
-              ชาวประมงได้ <b className="text-foam">+{caughtCount}</b> คนเดียว ไม่มีปลารอด
+              ชาวประมงได้ <b className="text-foam">+{caughtCount + 1}</b> คนเดียว (จับครบทุกตัว)
             </>
           ) : (
             <>

@@ -9,6 +9,7 @@ import Lobby from "./Lobby";
 import PlayScreen from "./PlayScreen";
 import GuessScreen from "./GuessScreen";
 import RevealScreen from "./RevealScreen";
+import SpectatorScreen from "./SpectatorScreen";
 import Settings from "./Settings";
 import History from "./History";
 
@@ -86,11 +87,20 @@ export default function RoomClient({ code }: { code: string }) {
     );
   }
 
+  const meNow = room.players.find((p) => p.id === playerId);
+  const spectating = meNow?.spectator ?? false;
+
   let content: ReactNode;
   if (view === "settings") {
     content = <Settings room={room} onBack={() => setView("room")} />;
   } else if (view === "history") {
     content = <History room={room} playerId={playerId} onBack={() => setView("room")} />;
+  } else if (
+    spectating &&
+    (room.phase === "READING" || room.phase === "DISCUSSION" || room.phase === "GUESSING")
+  ) {
+    // เข้ามากลางรอบ → ดูอย่างเดียว (REVEAL ดูผลได้ตามปกติ)
+    content = <SpectatorScreen room={room} playerId={playerId} />;
   } else {
     switch (room.phase) {
       case "LOBBY":

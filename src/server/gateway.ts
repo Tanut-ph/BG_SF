@@ -18,6 +18,7 @@ import {
   finishRound,
   getRoom,
   isFisherman,
+  isInRound,
   isValidAvatar,
   isValidCode,
   joinRoom,
@@ -301,16 +302,20 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
 
   socket.on("room:leave", (ack) => {
     const code = socket.data.roomCode;
+    const room0 = code ? getRoom(code) : undefined;
+    const wasInRound = room0 ? isInRound(room0, socket.data.playerId ?? "") : false;
     const room = leaveRoom(socket.id);
     if (code) socket.leave(code);
     socket.data.roomCode = undefined;
     socket.data.playerId = undefined;
     ack?.({ ok: true, data: null });
     if (room) {
-      // ถ้ามีคนออกกลางรอบ → ยกเลิกรอบ กันสถานะพัง (เช่น ชาวประมง/ปลาฟ้าหาย)
-      clearPhaseTimer(room.code);
-      if (abortRound(room)) {
-        io.to(room.code).emit("room:notice", "รอบถูกยกเลิก: มีผู้เล่นออกกลางเกม");
+      // ยกเลิกรอบเฉพาะเมื่อคนที่ออกมีบทบาทในรอบ (ผู้ชมออกไม่กระทบ)
+      if (wasInRound) {
+        clearPhaseTimer(room.code);
+        if (abortRound(room)) {
+          io.to(room.code).emit("room:notice", "รอบถูกยกเลิก: มีผู้เล่นออกกลางเกม");
+        }
       }
       broadcastRoom(io, room);
     }
@@ -319,6 +324,7 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
   socket.on("player:kick", ({ targetId }, ack) => {
     const room = requireHost(socket);
     if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
+    const wasInRound = isInRound(room, targetId);
     const result = kickPlayer(room, targetId);
     if ("error" in result) return ack?.({ ok: false, error: result.error });
 
@@ -327,10 +333,12 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
       io.to(result.kickedSocketId).emit("room:kicked", "โฮสต์เตะคุณออกจากห้อง");
       io.sockets.sockets.get(result.kickedSocketId)?.leave(room.code);
     }
-    // ถ้าเตะกลางรอบ → ยกเลิกรอบ
-    clearPhaseTimer(room.code);
-    if (abortRound(room)) {
-      io.to(room.code).emit("room:notice", "รอบถูกยกเลิก: โฮสต์เตะผู้เล่นออก");
+    // ยกเลิกรอบเฉพาะเมื่อคนที่ถูกเตะมีบทบาทในรอบ
+    if (wasInRound) {
+      clearPhaseTimer(room.code);
+      if (abortRound(room)) {
+        io.to(room.code).emit("room:notice", "รอบถูกยกเลิก: โฮสต์เตะผู้เล่นออก");
+      }
     }
     broadcastRoom(io, room);
     ack?.({ ok: true, data: null });
@@ -351,11 +359,16 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
         key,
         setTimeout(() => {
           graceTimers.delete(key);
+          const before = getRoom(code);
+          const wasInRound = before ? isInRound(before, playerId) : false;
           const r = removeIfStillDisconnected(code, playerId);
           if (r) {
-            clearPhaseTimer(r.code);
-            if (abortRound(r)) {
-              io.to(r.code).emit("room:notice", "รอบถูกยกเลิก: มีผู้เล่นหลุดออก");
+            // ยกเลิกรอบเฉพาะเมื่อคนที่หลุดมีบทบาทในรอบ (ผู้ชมหลุดไม่กระทบ)
+            if (wasInRound) {
+              clearPhaseTimer(r.code);
+              if (abortRound(r)) {
+                io.to(r.code).emit("room:notice", "รอบถูกยกเลิก: มีผู้เล่นหลุดออก");
+              }
             }
             broadcastRoom(io, r);
           }

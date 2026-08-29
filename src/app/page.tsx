@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HowToPlay } from "@/components/HowToPlay";
+import { MyStats } from "@/components/MyStats";
 
 export default function Home() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [showHow, setShowHow] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [kicked, setKicked] = useState(false);
   const canJoin = /^\d{4}$/.test(code);
 
@@ -68,14 +70,23 @@ export default function Home() {
 
       <div className="flex-1" />
 
-      <button
-        onClick={() => setShowHow(true)}
-        className="font-display mx-auto mt-8 rounded-full border border-kelp bg-surface px-5 py-2.5 text-sm text-foam"
-      >
-        📖 วิธีเล่น
-      </button>
+      <div className="mt-8 flex items-center justify-center gap-3">
+        <button
+          onClick={() => setShowHow(true)}
+          className="font-display rounded-full border border-kelp bg-surface px-5 py-2.5 text-sm text-foam"
+        >
+          📖 วิธีเล่น
+        </button>
+        <button
+          onClick={() => setShowStats(true)}
+          className="font-display rounded-full border border-kelp bg-surface px-5 py-2.5 text-sm text-foam"
+        >
+          📊 สถิติของฉัน
+        </button>
+      </div>
 
       {showHow && <HowToPlay onClose={() => setShowHow(false)} />}
+      {showStats && <MyStats onClose={() => setShowStats(false)} />}
     </main>
   );
 }

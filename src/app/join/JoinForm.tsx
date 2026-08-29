@@ -13,7 +13,10 @@ export default function JoinForm() {
   const codeParam = params.get("code");
   const isCreate = params.get("mode") === "create" || !codeParam;
 
-  const [avatar, setAvatar] = useState<string>(AVATARS[0]);
+  // สุ่มตัวปลาเริ่มต้น เพื่อให้แต่ละคนต่างกันแม้ไม่ได้กดเลือก
+  const [avatar, setAvatar] = useState<string>(
+    () => AVATARS[Math.floor(Math.random() * AVATARS.length)]
+  );
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

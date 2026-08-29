@@ -82,6 +82,13 @@ export function sanitizeName(name: unknown): string {
 export function isValidAvatar(avatar: unknown): avatar is string {
   return typeof avatar === "string" && (AVATARS as readonly string[]).includes(avatar);
 }
+
+/** เลือกตัวปลาที่ไม่ซ้ำกับคนในห้อง — ใช้ที่ขอถ้าว่าง ไม่งั้นหาตัวว่าง (ถ้าเต็มก็ใช้ที่ขอ) */
+function pickFreeAvatar(room: Room, requested: string): string {
+  const taken = new Set([...room.players.values()].map((p) => p.avatar));
+  if (!taken.has(requested)) return requested;
+  return (AVATARS as readonly string[]).find((a) => !taken.has(a)) ?? requested;
+}
 export function isValidCode(code: unknown): code is string {
   return typeof code === "string" && /^\d{4}$/.test(code);
 }
@@ -118,6 +125,7 @@ export function toPublicRoom(room: Room): PublicRoom {
       connected: p.connected,
       ready: p.ready,
       score: p.score,
+      spectator: room.round ? !room.round.roles.has(p.id) : false,
     })),
   };
 }
@@ -166,13 +174,13 @@ export function joinRoom(
 ): { room: Room; player: Player } | { error: string } {
   const room = rooms.get(code);
   if (!room) return { error: "ไม่พบห้องนี้" };
-  if (room.phase !== "LOBBY") return { error: "เกมเริ่มไปแล้ว เข้าไม่ได้" };
+  // เข้าระหว่างรอบได้ — จะเป็น "ผู้ชม" จนกว่าจะเริ่มรอบใหม่
 
   const player: Player = {
     id: randomUUID(),
     token: randomBytes(16).toString("hex"),
     name,
-    avatar,
+    avatar: pickFreeAvatar(room, avatar), // กันตัวปลาซ้ำ
     connected: true,
     ready: false,
     score: 0,
@@ -415,7 +423,13 @@ export function finishRound(
   const roundPoints: Record<string, number> = {};
   for (const p of players) roundPoints[p.id] = 0;
   for (const id of aliveFish) roundPoints[id] = A;
-  roundPoints[fishermanId] = outcome === "bust" ? 0 : round.caught.length;
+  // ชาวประมง: bust=0 · bank=+1/แดงที่จับ · sweep=จับครบทุกตัว (+แดง +ปลาฟ้าที่ปิดท้าย)
+  roundPoints[fishermanId] =
+    outcome === "bust"
+      ? 0
+      : outcome === "sweep"
+        ? round.caught.length + 1
+        : round.caught.length;
 
   // สะสมคะแนน: ต่อผู้เล่น (session) + ต่อชื่อ (ข้ามเกม)
   for (const p of players) {
@@ -485,6 +499,11 @@ export function removeQuestion(room: Room, index: number): Question[] | { error:
 /** ผู้เล่นคนนี้เป็นชาวประมงของรอบปัจจุบันหรือไม่ */
 export function isFisherman(room: Room, playerId: string): boolean {
   return !!room.round && roleOf(room.round, playerId) === "FISHERMAN";
+}
+
+/** ผู้เล่นคนนี้มีบทบาทในรอบปัจจุบันไหม (ไม่ใช่ผู้ชม) */
+export function isInRound(room: Room, playerId: string): boolean {
+  return !!room.round && room.round.roles.has(playerId);
 }
 
 /** ยกเลิกรอบที่กำลังเล่นอยู่ กลับห้องรอ — คงคะแนน/ประวัติ/ตั้งค่าไว้ (ใช้ตอนมีคนออกกลางเกม) */

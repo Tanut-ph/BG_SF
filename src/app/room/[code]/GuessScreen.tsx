@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { PublicRoom, RolePayload } from "@/shared/contracts";
 import { getSocket } from "@/lib/socket";
+import { YouBadge } from "./YouBadge";
 
 export default function GuessScreen({
   room,
@@ -29,8 +30,12 @@ export default function GuessScreen({
 
   if (!isFisherman) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-kelp border-t-lantern" />
+      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center px-6 text-center">
+        <div className="w-full pt-6 text-left">
+          <YouBadge room={room} playerId={playerId} />
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4">
+          <div className="h-16 w-16 animate-spin rounded-full border-4 border-kelp border-t-lantern" />
         <h1 className="font-display text-2xl font-semibold text-foam">
           ชาวประมงกำลังไล่จับ…
         </h1>
@@ -48,14 +53,15 @@ export default function GuessScreen({
         <p className="rounded-lg border border-kelp bg-surface px-3 py-2 text-xs text-mist-dim">
           จับปลาแดงได้แล้ว {caught.length} ตัว
         </p>
-        {isHost && (
-          <button
-            onClick={abort}
-            className="font-display mt-2 rounded-xl border border-kelp px-4 py-2 text-sm text-mist-dim"
-          >
-            ยกเลิกรอบ (ถ้าค้าง)
-          </button>
-        )}
+          {isHost && (
+            <button
+              onClick={abort}
+              className="font-display mt-2 rounded-xl border border-kelp px-4 py-2 text-sm text-mist-dim"
+            >
+              ยกเลิกรอบ (ถ้าค้าง)
+            </button>
+          )}
+        </div>
       </main>
     );
   }
@@ -68,9 +74,7 @@ export default function GuessScreen({
         <span className="font-display inline-flex items-center gap-2 rounded-full border border-lantern px-3 py-1.5 text-sm font-semibold text-lantern">
           🎣 ชาวประมง
         </span>
-        <span className="font-display rounded-full border border-kelp bg-surface px-3 py-1 text-xs text-mist">
-          ห้อง <b className="text-foam">{room.code}</b>
-        </span>
+        <YouBadge room={room} playerId={playerId} />
       </div>
 
       <div className="mt-4 flex items-center gap-3 rounded-2xl border border-lantern/40 bg-lantern/10 px-4 py-3">
