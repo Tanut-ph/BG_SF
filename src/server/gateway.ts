@@ -12,6 +12,7 @@ import {
   abortRound,
   addQuestion,
   canStartGame,
+  connectedCount,
   createRoom,
   endDiscussion,
   endReading,
@@ -25,9 +26,9 @@ import {
   kickPlayer,
   leaveRoom,
   markDisconnected,
+  MIN_PLAYERS,
   pickGuess,
   rejoin,
-  removeIfStillDisconnected,
   removeQuestion,
   resetToLobby,
   rolePayloadFor,
@@ -41,10 +42,6 @@ import {
 
 /** timer ของ phase ต่อห้อง (server เป็นเจ้าของเวลา กัน drift/โกง) */
 const phaseTimers = new Map<string, NodeJS.Timeout>();
-/** grace ก่อนลบผู้เล่นที่หลุด (ms) — เผื่อรีเฟรช/จอล็อกแล้วกลับมา */
-const DISCONNECT_GRACE_MS = 8000;
-const graceTimers = new Map<string, NodeJS.Timeout>();
-const graceKey = (code: string, playerId: string) => `${code}:${playerId}`;
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -151,11 +148,6 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
     const result = rejoin(code, token, socket.id);
     if ("error" in result) return ack({ ok: false, error: result.error });
 
-    // กลับมาแล้ว — ยกเลิก grace ที่ตั้งไว้ตอนหลุด
-    const gk = graceKey(code, result.player.id);
-    clearTimeout(graceTimers.get(gk));
-    graceTimers.delete(gk);
-
     bindSocket(socket, code, result.player.id);
     ack({ ok: true, data: { playerId: result.player.id, room: toPublicRoom(result.room) } });
     broadcastRoom(io, result.room);
@@ -184,6 +176,12 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
     const room = requireHost(socket);
     if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
     if (room.phase !== "REVEAL") return ack?.({ ok: false, error: "เริ่มรอบใหม่ได้จากหน้าเฉลยเท่านั้น" });
+    if (connectedCount(room) < MIN_PLAYERS) {
+      resetToLobby(room);
+      io.to(room.code).emit("room:notice", "ผู้เล่นออนไลน์ไม่พอ กลับสู่ห้องรอ");
+      broadcastRoom(io, room);
+      return ack?.({ ok: false, error: "ผู้เล่นออนไลน์ไม่พอ" });
+    }
     beginRound(io, room);
     ack?.({ ok: true, data: null });
   });
@@ -345,35 +343,10 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
   });
 
   socket.on("disconnect", (reason) => {
-    const code = socket.data.roomCode;
-    const playerId = socket.data.playerId;
+    // แค่ทำเครื่องหมาย "หลุด" — ไม่ลบ ไม่ยกเลิกรอบ ให้คนที่เหลือเล่นต่อได้
+    // (คนหลุดกลับเข้ามาด้วย token ได้, หรือจะถูกตัดออกตอนขึ้นรอบใหม่)
     const room = markDisconnected(socket.id);
     if (room) broadcastRoom(io, room);
     console.log(`❌ disconnected: ${socket.id} (${reason})`);
-
-    // grace: ถ้าไม่กลับมาภายในเวลาที่กำหนด → ลบออกถาวร (+ยกเลิกรอบถ้ากลางเกม)
-    if (code && playerId) {
-      const key = graceKey(code, playerId);
-      clearTimeout(graceTimers.get(key));
-      graceTimers.set(
-        key,
-        setTimeout(() => {
-          graceTimers.delete(key);
-          const before = getRoom(code);
-          const wasInRound = before ? isInRound(before, playerId) : false;
-          const r = removeIfStillDisconnected(code, playerId);
-          if (r) {
-            // ยกเลิกรอบเฉพาะเมื่อคนที่หลุดมีบทบาทในรอบ (ผู้ชมหลุดไม่กระทบ)
-            if (wasInRound) {
-              clearPhaseTimer(r.code);
-              if (abortRound(r)) {
-                io.to(r.code).emit("room:notice", "รอบถูกยกเลิก: มีผู้เล่นหลุดออก");
-              }
-            }
-            broadcastRoom(io, r);
-          }
-        }, DISCONNECT_GRACE_MS)
-      );
-    }
   });
 }

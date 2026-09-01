@@ -305,16 +305,26 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-/** เช็คว่าเริ่มเกมได้ไหม: อยู่ใน LOBBY, ผู้เล่นครบ, และทุกคนที่ไม่ใช่โฮสต์กดพร้อม */
+/** เช็คว่าเริ่มเกมได้ไหม: อยู่ใน LOBBY, คนที่ออนไลน์ครบ, และทุกคน(ที่ออนไลน์)ที่ไม่ใช่โฮสต์กดพร้อม */
 export function canStartGame(room: Room): boolean {
   if (room.phase !== "LOBBY") return false;
-  if (room.players.size < MIN_PLAYERS) return false;
-  const others = [...room.players.values()].filter((p) => p.id !== room.hostId);
+  const connected = [...room.players.values()].filter((p) => p.connected);
+  if (connected.length < MIN_PLAYERS) return false;
+  const others = connected.filter((p) => p.id !== room.hostId);
   return others.length > 0 && others.every((p) => p.ready);
+}
+
+/** จำนวนผู้เล่นที่ยังออนไลน์ (ใช้เช็คก่อนเริ่มรอบใหม่) */
+export function connectedCount(room: Room): number {
+  return [...room.players.values()].filter((p) => p.connected).length;
 }
 
 /** สุ่มบทบาท (ชาวประมง 1 / ปลาฟ้า 1 / ปลาแดงที่เหลือ) + แจกคำถาม + เข้าสู่ READING */
 export function startRound(room: Room): Round {
+  // ตัดคนที่ยังหลุดอยู่ออกก่อนเริ่มรอบ (ให้เฉพาะคนออนไลน์ได้บทบาท) — คงโฮสต์ไว้เสมอ
+  for (const [id, p] of room.players) {
+    if (!p.connected && id !== room.hostId) room.players.delete(id);
+  }
   const ids = shuffle([...room.players.keys()]);
   const roles = new Map<string, Role>();
   roles.set(ids[0], "FISHERMAN");
