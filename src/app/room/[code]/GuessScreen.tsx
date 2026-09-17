@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { PublicRoom, RolePayload } from "@/shared/contracts";
 import { getSocket } from "@/lib/socket";
 import { YouBadge } from "./YouBadge";
+import { NewRoundButton } from "./NewRoundButton";
 
 export default function GuessScreen({
   room,
@@ -61,6 +62,9 @@ export default function GuessScreen({
               ยกเลิกรอบ (ถ้าค้าง)
             </button>
           )}
+          <div className="w-full max-w-xs">
+            <NewRoundButton room={room} playerId={playerId} />
+          </div>
         </div>
       </main>
     );
@@ -148,6 +152,7 @@ export default function GuessScreen({
           โหมดนี้ต้องไล่จับต่อจนกว่าจะเจอปลาฟ้า
         </p>
       )}
+      <NewRoundButton room={room} playerId={playerId} />
     </main>
   );
 }

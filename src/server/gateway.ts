@@ -175,7 +175,8 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
   socket.on("game:nextRound", (ack) => {
     const room = requireHost(socket);
     if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
-    if (room.phase !== "REVEAL") return ack?.({ ok: false, error: "เริ่มรอบใหม่ได้จากหน้าเฉลยเท่านั้น" });
+    // หัวห้องเริ่มรอบใหม่ได้ทุกช่วง (ยกเว้นในห้องรอ — ใช้ปุ่มเริ่มเกม)
+    if (room.phase === "LOBBY") return ack?.({ ok: false, error: "อยู่ในห้องรอ ใช้ปุ่มเริ่มเกม" });
     if (connectedCount(room) < MIN_PLAYERS) {
       resetToLobby(room);
       io.to(room.code).emit("room:notice", "ผู้เล่นออนไลน์ไม่พอ กลับสู่ห้องรอ");

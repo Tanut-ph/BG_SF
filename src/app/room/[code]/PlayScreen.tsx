@@ -6,6 +6,7 @@ import { getSocket } from "@/lib/socket";
 import { Countdown } from "@/components/Countdown";
 import { RoleCard } from "./RoleCard";
 import { YouBadge } from "./YouBadge";
+import { NewRoundButton } from "./NewRoundButton";
 
 export default function PlayScreen({
   room,
@@ -70,6 +71,7 @@ export default function PlayScreen({
             จำบทบาทให้ดี เดี๋ยววางมือถือแล้วคุยกัน
           </p>
         )}
+        <NewRoundButton room={room} playerId={playerId} />
       </main>
     );
   }
@@ -125,6 +127,7 @@ export default function PlayScreen({
           รอ<b className="text-lantern">ชาวประมง ({fishermanName})</b> เริ่มช่วงทาย
         </p>
       )}
+      <NewRoundButton room={room} playerId={playerId} />
 
       {/* overlay ย้อนดูโรล */}
       {reviewOpen && (

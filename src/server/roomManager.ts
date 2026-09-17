@@ -21,7 +21,7 @@ import {
   type RoomSettings,
   type RoundSummary,
 } from "../shared/contracts";
-import { pickRandom, QUESTIONS } from "./questions";
+import { QUESTIONS } from "./questions";
 
 export const DEFAULT_READING_SECONDS = 40;
 export const DEFAULT_DISCUSSION_SECONDS = 90;
@@ -65,6 +65,7 @@ export interface Room {
   reveal: RevealResult | null;
   settings: RoomSettings;
   questions: Question[];
+  questionBag: Question[]; // ถุงสุ่มแบบวน — หยิบจนหมดถุงก่อนเติมใหม่ (กันซ้ำเร็ว)
   history: RoundSummary[];
   scoreboard: Map<string, number>; // name -> คะแนนสะสมข้ามเกม
   roundNo: number;
@@ -156,6 +157,7 @@ export function createRoom(name: string, avatar: string, socketId: string) {
     reveal: null,
     settings: defaultSettings(),
     questions: [...QUESTIONS],
+    questionBag: [],
     history: [],
     scoreboard: new Map(),
     roundNo: 0,
@@ -319,6 +321,15 @@ export function connectedCount(room: Room): number {
   return [...room.players.values()].filter((p) => p.connected).length;
 }
 
+/** หยิบคำถามถัดไปแบบวน — สับไพ่ทั้งคลังใส่ถุง แล้วหยิบจนหมดก่อนสับใหม่ (ไม่ซ้ำจนครบทุกข้อ) */
+function nextQuestion(room: Room): Question {
+  if (room.questionBag.length === 0) {
+    const pool = room.questions.length > 0 ? room.questions : QUESTIONS;
+    room.questionBag = shuffle([...pool]);
+  }
+  return room.questionBag.pop()!;
+}
+
 /** สุ่มบทบาท (ชาวประมง 1 / ปลาฟ้า 1 / ปลาแดงที่เหลือ) + แจกคำถาม + เข้าสู่ READING */
 export function startRound(room: Room): Round {
   // ตัดคนที่ยังหลุดอยู่ออกก่อนเริ่มรอบ (ให้เฉพาะคนออนไลน์ได้บทบาท) — คงโฮสต์ไว้เสมอ
@@ -331,8 +342,7 @@ export function startRound(room: Room): Round {
   roles.set(ids[1], "BLUE");
   for (let i = 2; i < ids.length; i++) roles.set(ids[i], "RED");
 
-  const pool = room.questions.length > 0 ? room.questions : QUESTIONS;
-  const q = pickRandom(pool);
+  const q = nextQuestion(room);
   room.round = { roles, prompt: q.prompt, answer: q.answer, caught: [] };
   room.reveal = null;
   room.roundNo += 1;
@@ -496,6 +506,7 @@ export function addQuestion(room: Room, prompt: unknown, answer: unknown): Quest
   const a = typeof answer === "string" ? answer.trim() : "";
   if (!p || !a) return { error: "ต้องมีทั้งคำถามและคำตอบ" };
   room.questions.push({ prompt: p.slice(0, 200), answer: a.slice(0, 200) });
+  room.questionBag = []; // เติมถุงใหม่จากคลังล่าสุด
   return room.questions;
 }
 
@@ -503,6 +514,7 @@ export function removeQuestion(room: Room, index: number): Question[] | { error:
   if (index < 0 || index >= room.questions.length) return { error: "ไม่พบคำถาม" };
   if (room.questions.length <= 1) return { error: "ต้องมีคำถามอย่างน้อย 1 ข้อ" };
   room.questions.splice(index, 1);
+  room.questionBag = []; // เติมถุงใหม่จากคลังล่าสุด
   return room.questions;
 }
 
