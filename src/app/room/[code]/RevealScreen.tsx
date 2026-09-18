@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import type { PublicRoom, Role } from "@/shared/contracts";
 import { getSocket } from "@/lib/socket";
 import { addGameRecord } from "@/lib/history";
+import { recordPlayed, excludeFor } from "@/lib/playedQuestions";
 import { YouBadge } from "./YouBadge";
 
 const ROLE_TAG: Record<Role, { label: string; cls: string }> = {
@@ -24,7 +25,9 @@ export default function RevealScreen({
   // บันทึกผลรอบนี้ลงเครื่อง (ครั้งเดียวต่อรอบ) เพื่อโชว์ที่หน้าหลัก
   useEffect(() => {
     if (!reveal) return;
-    if (!reveal.roles[playerId]) return; // ผู้ชมรอบนี้ ไม่บันทึก
+    // จำคำถามที่เล่นแล้วลงเครื่องนี้ (ทุกคน รวมผู้ชม) เพื่อกันซ้ำเมื่อเป็นหัวห้องรอบหน้า
+    recordPlayed(reveal.prompt);
+    if (!reveal.roles[playerId]) return; // ผู้ชมรอบนี้ ไม่บันทึกสถิติคะแนน
     const me = room.players.find((p) => p.id === playerId);
     if (!me) return;
     addGameRecord({
@@ -67,7 +70,8 @@ export default function RevealScreen({
     .filter((p) => reveal.roles[p.id]) // ตัดผู้ชมที่เข้ามากลางรอบออก
     .sort((a, b) => (reveal.roundPoints[b.id] ?? 0) - (reveal.roundPoints[a.id] ?? 0));
 
-  const nextRound = () => getSocket().emit("game:nextRound");
+  const nextRound = () =>
+    getSocket().emit("game:nextRound", { excludePrompts: excludeFor(room) });
   const reset = () => getSocket().emit("game:reset");
 
   return (

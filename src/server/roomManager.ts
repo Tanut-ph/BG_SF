@@ -31,6 +31,7 @@ function defaultSettings(): RoomSettings {
     readingSeconds: DEFAULT_READING_SECONDS,
     discussionSeconds: DEFAULT_DISCUSSION_SECONDS,
     allowFinish: true,
+    avoidRepeat: false,
     hideQuestionFromFisherman: false,
   };
 }
@@ -321,17 +322,26 @@ export function connectedCount(room: Room): number {
   return [...room.players.values()].filter((p) => p.connected).length;
 }
 
-/** หยิบคำถามถัดไปแบบวน — สับไพ่ทั้งคลังใส่ถุง แล้วหยิบจนหมดก่อนสับใหม่ (ไม่ซ้ำจนครบทุกข้อ) */
-function nextQuestion(room: Room): Question {
-  if (room.questionBag.length === 0) {
-    const pool = room.questions.length > 0 ? room.questions : QUESTIONS;
-    room.questionBag = shuffle([...pool]);
+/**
+ * หยิบคำถามถัดไปแบบวน — สับไพ่ทั้งคลังใส่ถุง หยิบจนหมดก่อนสับใหม่ (ไม่ซ้ำจนครบทุกข้อ)
+ * exclude = ข้อที่เครื่องหัวห้องเพิ่งเล่น (กันซ้ำ) — ถ้าทุกข้อถูกกันหมดจะยอมซ้ำ
+ */
+function nextQuestion(room: Room, exclude: string[] = []): Question {
+  const ex = new Set(exclude);
+  const pool = room.questions.length > 0 ? room.questions : QUESTIONS;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (room.questionBag.length === 0) room.questionBag = shuffle([...pool]);
+    const idx = room.questionBag.findIndex((q) => !ex.has(q.prompt));
+    if (idx >= 0) return room.questionBag.splice(idx, 1)[0];
+    room.questionBag = []; // ทั้งถุงถูกกัน → เติมใหม่ลองอีกรอบ
   }
+  // ทุกข้อในคลังถูกกันหมด → ยอมซ้ำ
+  if (room.questionBag.length === 0) room.questionBag = shuffle([...pool]);
   return room.questionBag.pop()!;
 }
 
 /** สุ่มบทบาท (ชาวประมง 1 / ปลาฟ้า 1 / ปลาแดงที่เหลือ) + แจกคำถาม + เข้าสู่ READING */
-export function startRound(room: Room): Round {
+export function startRound(room: Room, excludePrompts: string[] = []): Round {
   // ตัดคนที่ยังหลุดอยู่ออกก่อนเริ่มรอบ (ให้เฉพาะคนออนไลน์ได้บทบาท) — คงโฮสต์ไว้เสมอ
   for (const [id, p] of room.players) {
     if (!p.connected && id !== room.hostId) room.players.delete(id);
@@ -342,7 +352,7 @@ export function startRound(room: Room): Round {
   roles.set(ids[1], "BLUE");
   for (let i = 2; i < ids.length; i++) roles.set(ids[i], "RED");
 
-  const q = nextQuestion(room);
+  const q = nextQuestion(room, room.settings.avoidRepeat ? excludePrompts : []);
   room.round = { roles, prompt: q.prompt, answer: q.answer, caught: [] };
   room.reveal = null;
   room.roundNo += 1;
@@ -465,6 +475,7 @@ export function finishRound(
     outcome,
     fishermanId,
     blueId,
+    prompt: round.prompt,
     answer: round.answer,
     roles,
     caughtIds: [...round.caught],
@@ -498,6 +509,9 @@ export function updateSettings(room: Room, partial: Partial<RoomSettings>): void
   }
   if (typeof partial.hideQuestionFromFisherman === "boolean") {
     room.settings.hideQuestionFromFisherman = partial.hideQuestionFromFisherman;
+  }
+  if (typeof partial.avoidRepeat === "boolean") {
+    room.settings.avoidRepeat = partial.avoidRepeat;
   }
 }
 

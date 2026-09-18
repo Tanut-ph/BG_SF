@@ -33,6 +33,7 @@ export interface RoomSettings {
   readingSeconds: number;
   discussionSeconds: number;
   allowFinish: boolean; // เปิดปุ่ม "จบการจับ" ให้ชาวประมงหรือไม่
+  avoidRepeat: boolean; // กันคำถามซ้ำที่เครื่องหัวห้องเคยเล่นใน 90 วัน
   hideQuestionFromFisherman: boolean; // ซ่อนคำถามจากชาวประมง (โหมดยาก)
 }
 
@@ -84,6 +85,7 @@ export interface RevealResult {
   outcome: "bust" | "bank" | "sweep";
   fishermanId: string;
   blueId: string;
+  prompt: string; // คำถามของรอบนี้ (เปิดเผยตอนเฉลย — ใช้บันทึกกันซ้ำที่เครื่องหัวห้อง)
   answer: string;
   roles: Record<string, Role>; // playerId -> Role
   caughtIds: string[]; // ปลาแดงที่ถูกจับ (เรียงลำดับ)
@@ -134,14 +136,20 @@ export interface ClientToServerEvents {
     payload: { ready: boolean },
     ack?: (res: Result<null>) => void
   ) => void;
-  /** โฮสต์เริ่มเกม (สุ่มบทบาท + แจกคำถาม) */
-  "game:start": (ack?: (res: Result<null>) => void) => void;
+  /** โฮสต์เริ่มเกม (สุ่มบทบาท + แจกคำถาม) — excludePrompts = ข้อที่เครื่องหัวห้องเพิ่งเล่น (กันซ้ำ) */
+  "game:start": (
+    payload: { excludePrompts?: string[] },
+    ack?: (res: Result<null>) => void
+  ) => void;
   /** โฮสต์ข้ามเวลาอ่านโจทย์ */
   "game:skipReading": (ack?: (res: Result<null>) => void) => void;
   /** โฮสต์ข้ามเวลาคุยกัน → เข้าช่วงทาย */
   "game:skipDiscussion": (ack?: (res: Result<null>) => void) => void;
-  /** โฮสต์เริ่มรอบใหม่ (จากหน้าเฉลย) */
-  "game:nextRound": (ack?: (res: Result<null>) => void) => void;
+  /** โฮสต์เริ่มรอบใหม่ (ได้ทุกช่วง) */
+  "game:nextRound": (
+    payload: { excludePrompts?: string[] },
+    ack?: (res: Result<null>) => void
+  ) => void;
   /** โฮสต์รีเซ็ตกลับห้องรอ (จบเกม) */
   "game:reset": (ack?: (res: Result<null>) => void) => void;
   /** ชาวประมงเลือกจับผู้เล่นทีละคน (เรียกซ้ำได้) */

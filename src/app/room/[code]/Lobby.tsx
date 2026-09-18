@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MIN_PLAYERS, type PublicRoom } from "@/shared/contracts";
 import { getSocket } from "@/lib/socket";
+import { excludeFor } from "@/lib/playedQuestions";
 import { HowToPlay } from "@/components/HowToPlay";
 
 export default function Lobby({
@@ -44,7 +45,7 @@ export default function Lobby({
 
   const start = () => {
     setError("");
-    getSocket().emit("game:start", (res) => {
+    getSocket().emit("game:start", { excludePrompts: excludeFor(room) }, (res) => {
       if (!res.ok) setError(res.error);
     });
   };

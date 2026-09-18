@@ -138,6 +138,15 @@ export default function Settings({
             }
           />
         </div>
+        <div className="flex items-center gap-3 py-4">
+          <div className="flex-1">
+            <div className="font-medium">กันคำถามซ้ำ (90 วัน)</div>
+            <div className="text-xs text-mist-dim">
+              ไม่หยิบข้อที่ “เครื่องหัวห้อง” เพิ่งเล่นภายใน 90 วัน
+            </div>
+          </div>
+          <Toggle on={s.avoidRepeat} onClick={() => update({ avoidRepeat: !s.avoidRepeat })} />
+        </div>
       </div>
 
       {/* question bank */}

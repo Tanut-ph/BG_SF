@@ -97,8 +97,8 @@ function schedulePhaseEnd(io: IO, code: string, deadline: number) {
 }
 
 /** เริ่มรอบ: สุ่มบทบาท + แจกคำถามลับ + เข้าสู่ READING พร้อม timer */
-function beginRound(io: IO, room: Room) {
-  startRound(room);
+function beginRound(io: IO, room: Room, excludePrompts: string[] = []) {
+  startRound(room, excludePrompts);
   dealRoles(io, room);
   broadcastRoom(io, room);
   if (room.deadline) schedulePhaseEnd(io, room.code, room.deadline);
@@ -164,15 +164,15 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
     broadcastRoom(io, room);
   });
 
-  socket.on("game:start", (ack) => {
+  socket.on("game:start", ({ excludePrompts }, ack) => {
     const room = requireHost(socket);
     if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
     if (!canStartGame(room)) return ack?.({ ok: false, error: "ยังเริ่มไม่ได้ (ต้องครบคน + ทุกคนพร้อม)" });
-    beginRound(io, room);
+    beginRound(io, room, excludePrompts ?? []);
     ack?.({ ok: true, data: null });
   });
 
-  socket.on("game:nextRound", (ack) => {
+  socket.on("game:nextRound", ({ excludePrompts }, ack) => {
     const room = requireHost(socket);
     if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
     // หัวห้องเริ่มรอบใหม่ได้ทุกช่วง (ยกเว้นในห้องรอ — ใช้ปุ่มเริ่มเกม)
@@ -183,7 +183,7 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
       broadcastRoom(io, room);
       return ack?.({ ok: false, error: "ผู้เล่นออนไลน์ไม่พอ" });
     }
-    beginRound(io, room);
+    beginRound(io, room, excludePrompts ?? []);
     ack?.({ ok: true, data: null });
   });
 
