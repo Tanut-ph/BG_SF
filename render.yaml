@@ -1,14 +1,22 @@
 # Render.com blueprint — deploy โป๊ะแตกเป็น web service (รองรับ WebSocket)
-# ใช้: เชื่อม repo กับ Render แล้วเลือก "Blueprint" หรือใช้ไฟล์นี้อัตโนมัติ
+# ใช้: เชื่อม repo กับ Render แล้วเลือก "Blueprint" (Render อ่านไฟล์นี้อัตโนมัติ)
 services:
   - type: web
     name: popbaek
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build
+    # --include=dev เพราะ build ต้องใช้ typescript/tailwind/postcss (อยู่ใน devDependencies)
+    # ถ้าไม่ใส่ NODE_ENV=production จะทำให้ npm ข้าม devDependencies → build ล้ม
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start
     # Render กำหนด PORT ให้เอง (server อ่านจาก process.env.PORT)
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
-    healthCheckPath: /
+      # MongoDB — ตั้งค่าจริงในหน้า Dashboard (Environment) ไม่ commit ลง repo
+      # ใช้สตริงแบบ mongodb+srv://... ได้ (Render DNS ปกติ)
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: popbaek

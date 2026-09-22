@@ -4,7 +4,7 @@
 
 เกมนี้ใช้ **custom server (Next.js + Socket.IO) รวมกัน** และเก็บ state ของห้อง **ในหน่วยความจำ** จึงต้อง:
 
-1. **โฮสต์ที่รัน process ค้างได้ + รองรับ WebSocket** — เช่น Railway / Render / Fly.io
+1. **โฮสต์ที่รัน process ค้างได้ + รองรับ WebSocket** — เช่น Render / Fly.io (ฟรี) หรือ Railway
    ❌ ใช้ Vercel/Netlify serverless functions ไม่ได้ (ตัด WebSocket + ไม่มี process ค้าง)
 2. **รันแค่ 1 instance** — เพราะ state อยู่ในหน่วยความจำ ถ้าหลาย instance ผู้เล่นจะกระจายคนละห้อง
    (จะ scale หลาย instance ได้ต้องเพิ่ม Redis adapter ของ Socket.IO — ดูหัวข้อ "อนาคต")
@@ -13,31 +13,39 @@ Production build + server ทดสอบผ่านแล้ว (`npm run buil
 
 ---
 
-## ตัวเลือก A — Railway (ง่ายสุด)
+## ตัวเลือก A — Render (แนะนำ · ฟรีจริง ไม่ต้องผูกบัตร)
 
-1. push โปรเจกต์ขึ้น GitHub
-2. ที่ [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
-3. Railway จะเจอ `Dockerfile` และ build ให้อัตโนมัติ (หรือใช้ Nixpacks: build `npm run build`, start `npm run start`)
-4. Railway ตั้ง `PORT` ให้เอง — server อ่านจาก `process.env.PORT` อยู่แล้ว ไม่ต้องตั้งเพิ่ม
-5. เปิด **Settings → Networking → Generate Domain** เพื่อได้ URL สาธารณะ
-6. ตั้งจำนวน replica = **1**
+1. push ขึ้น GitHub (ทำแล้ว)
+2. ที่ [render.com](https://render.com) → สมัคร/ล็อกอิน (ใช้ GitHub ได้)
+3. **New → Blueprint** → เลือก repo `Tanut-ph/BG_SF` → Render อ่าน `render.yaml` อัตโนมัติ
+   (หรือ **New → Web Service** ตั้งเอง: Runtime Node, Build `npm ci --include=dev && npm run build`, Start `npm run start`, Plan Free)
+4. ตอน deploy จะให้กรอก **Environment Variable** ที่ตั้ง `sync: false` ไว้:
+   - `MONGODB_URI` = สตริงจาก Atlas — บน Render ใช้แบบ `mongodb+srv://...` ได้เลย (DNS ปกติ):
+     `mongodb+srv://oam23636_db_user:<password>@soundfish.s9lbwfu.mongodb.net/?appName=Soundfish`
+   - `MONGODB_DB` = `popbaek` (ตั้งไว้ใน render.yaml แล้ว)
+   - ถ้าไม่ใส่ `MONGODB_URI` แอปยังรันได้ (in-memory) แค่ไม่กันซ้ำข้ามเครื่อง
+5. **Atlas Network Access** ต้องเปิด `0.0.0.0/0` (อนุญาตทุก IP) เพราะ IP ของ Render ไม่คงที่
+6. Render ตั้ง `PORT` ให้เอง · Health check = `/` · free plan = 1 instance อยู่แล้ว (ตรงกับที่เกมต้องการ)
 
-## ตัวเลือก B — Render
+> ⚠️ **ข้อจำกัด free plan:** ถ้าไม่มีคนเข้าเว็บ ~15 นาที Render จะพักเครื่อง (sleep)
+> คนเข้าครั้งถัดไปจะรอ cold start ~50 วินาทีให้เครื่องตื่น แล้วใช้ได้ปกติ
+> (สำหรับเกมปาร์ตี้ที่เล่นเป็นรอบ ๆ ยอมรับได้ — หัวห้องเปิดรอแป๊บเดียว)
 
-1. push ขึ้น GitHub
-2. ที่ [render.com](https://render.com) → **New → Blueprint** แล้วชี้ไปที่ repo (มี `render.yaml` ให้แล้ว)
-   หรือ **New → Web Service** ตั้งเอง: Build `npm ci && npm run build`, Start `npm run start`
-3. Render ตั้ง `PORT` ให้เอง · Health check path = `/`
-4. instance count = 1
+## ตัวเลือก B — Fly.io (ไม่หลับ แต่ต้องผูกบัตร)
 
-## ตัวเลือก C — Fly.io
+- ข้อดี: `min_machines_running = 1` + `auto_stop_machines = false` → ไม่พักเครื่อง, WebSocket ลื่นกว่า, เซิร์ฟเวอร์สิงคโปร์ใกล้ไทย
+- ข้อเสีย: ต้องใส่บัตรเครดิตตอนสมัคร (ใช้น้อยยังฟรี แต่เกินโดนชาร์จ)
 
 ```bash
 flyctl launch --no-deploy   # ครั้งแรก (มี fly.toml ให้แล้ว — ตอบ no ถ้าถามจะเขียนทับ)
+flyctl secrets set MONGODB_URI="mongodb+srv://..." MONGODB_DB=popbaek
 flyctl deploy
 ```
 - `fly.toml` ตั้ง `internal_port = 3000`, `min_machines_running = 1`, `auto_stop_machines = false` (กันเครื่องดับกลางเกม)
 - เปลี่ยน `primary_region` ได้ (ค่าเริ่มต้น `sin` = สิงคโปร์)
+
+> Railway ก็ deploy ได้ (เจอ `Dockerfile` อัตโนมัติ, ตั้ง replica = 1, ใส่ env `MONGODB_URI`)
+> แต่ตอนนี้ให้แค่เครดิตทดลอง ไม่ฟรีถาวร จึงแนะนำ Render/Fly.io แทน
 
 ---
 
@@ -46,8 +54,10 @@ flyctl deploy
 | ตัวแปร | ค่า | หมายเหตุ |
 |---|---|---|
 | `PORT` | แพลตฟอร์มตั้งให้เอง | server อ่านอัตโนมัติ (default 3000) |
-| `NODE_ENV` | `production` | ตั้งใน Dockerfile/config แล้ว |
+| `NODE_ENV` | `production` | ตั้งใน render.yaml/Dockerfile แล้ว |
 | `HOST` | (ไม่ต้องตั้ง) | server bind `0.0.0.0` อยู่แล้ว |
+| `MONGODB_URI` | สตริงจาก Atlas | ไม่บังคับ · ใส่เพื่อกันคำถามซ้ำข้ามเครื่อง · ไม่ใส่ = in-memory |
+| `MONGODB_DB` | `popbaek` | ชื่อ database (ตั้ง default แล้ว) |
 
 ## ทดสอบหลัง deploy
 
