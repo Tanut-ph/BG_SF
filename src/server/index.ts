@@ -15,6 +15,7 @@ import type {
   SocketData,
 } from "../shared/contracts";
 import { registerRoomHandlers } from "./gateway";
+import { connectDb } from "./db";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOST ?? "localhost";
@@ -25,6 +26,7 @@ const handle = app.getRequestHandler();
 
 async function main() {
   await app.prepare();
+  await connectDb(); // เชื่อม MongoDB ถ้ามี MONGODB_URI (ไม่มีก็ทำงาน in-memory ต่อ)
 
   const httpServer = createServer((req, res) => {
     handle(req, res);

@@ -39,6 +39,7 @@ import {
   updateSettings,
   type Room,
 } from "./roomManager";
+import { getRecentlyPlayed, recordPlayedQuestion } from "./db";
 
 /** timer ของ phase ต่อห้อง (server เป็นเจ้าของเวลา กัน drift/โกง) */
 const phaseTimers = new Map<string, NodeJS.Timeout>();
@@ -102,6 +103,19 @@ function beginRound(io: IO, room: Room, excludePrompts: string[] = []) {
   dealRoles(io, room);
   broadcastRoom(io, room);
   if (room.deadline) schedulePhaseEnd(io, room.code, room.deadline);
+  // บันทึกคำถามที่เพิ่งแจกลง DB (กันซ้ำแบบ global) — fire-and-forget, ไม่มี DB ก็ no-op
+  if (room.settings.avoidRepeat && room.round) {
+    void recordPlayedQuestion(room.round.prompt);
+  }
+}
+
+/**
+ * รวมรายการกันซ้ำจาก 2 แหล่ง: เครื่องหัวห้อง (excludePrompts) + DB global (ถ้าเปิด avoidRepeat)
+ */
+async function buildExclude(room: Room, excludePrompts?: string[]): Promise<string[]> {
+  if (!room.settings.avoidRepeat) return excludePrompts ?? [];
+  const fromDb = await getRecentlyPlayed(90);
+  return [...(excludePrompts ?? []), ...fromDb];
 }
 
 function requireHost(socket: GameSocket): Room | null {
@@ -164,15 +178,15 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
     broadcastRoom(io, room);
   });
 
-  socket.on("game:start", ({ excludePrompts }, ack) => {
+  socket.on("game:start", async ({ excludePrompts }, ack) => {
     const room = requireHost(socket);
     if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
     if (!canStartGame(room)) return ack?.({ ok: false, error: "ยังเริ่มไม่ได้ (ต้องครบคน + ทุกคนพร้อม)" });
-    beginRound(io, room, excludePrompts ?? []);
+    beginRound(io, room, await buildExclude(room, excludePrompts));
     ack?.({ ok: true, data: null });
   });
 
-  socket.on("game:nextRound", ({ excludePrompts }, ack) => {
+  socket.on("game:nextRound", async ({ excludePrompts }, ack) => {
     const room = requireHost(socket);
     if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
     // หัวห้องเริ่มรอบใหม่ได้ทุกช่วง (ยกเว้นในห้องรอ — ใช้ปุ่มเริ่มเกม)
@@ -183,7 +197,7 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
       broadcastRoom(io, room);
       return ack?.({ ok: false, error: "ผู้เล่นออนไลน์ไม่พอ" });
     }
-    beginRound(io, room, excludePrompts ?? []);
+    beginRound(io, room, await buildExclude(room, excludePrompts));
     ack?.({ ok: true, data: null });
   });
 
