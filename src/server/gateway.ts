@@ -12,6 +12,7 @@ import {
   abortRound,
   addQuestion,
   canStartGame,
+  clearQuestionBag,
   connectedCount,
   createRoom,
   endDiscussion,
@@ -39,7 +40,7 @@ import {
   updateSettings,
   type Room,
 } from "./roomManager";
-import { getRecentlyPlayed, recordPlayedQuestion } from "./db";
+import { getQuestions, getRecentlyPlayed, recordPlayedQuestion } from "./db";
 
 /** timer ของ phase ต่อห้อง (server เป็นเจ้าของเวลา กัน drift/โกง) */
 const phaseTimers = new Map<string, NodeJS.Timeout>();
@@ -292,23 +293,25 @@ export function registerRoomHandlers(io: IO, socket: GameSocket) {
   socket.on("questions:list", (ack) => {
     const room = requireHost(socket);
     if (!room) return ack({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
-    ack({ ok: true, data: room.questions });
+    ack({ ok: true, data: getQuestions() });
   });
 
-  socket.on("question:add", ({ prompt, answer }, ack) => {
+  socket.on("question:add", async ({ prompt, answer }, ack) => {
     const room = requireHost(socket);
     if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
-    const result = addQuestion(room, prompt, answer);
+    const result = await addQuestion(prompt, answer);
     if ("error" in result) return ack?.({ ok: false, error: result.error });
+    clearQuestionBag(room); // ให้ห้องนี้หยิบจากคลังล่าสุดทันที
     broadcastRoom(io, room);
     ack?.({ ok: true, data: result });
   });
 
-  socket.on("question:remove", ({ index }, ack) => {
+  socket.on("question:remove", async ({ index }, ack) => {
     const room = requireHost(socket);
     if (!room) return ack?.({ ok: false, error: "เฉพาะโฮสต์เท่านั้น" });
-    const result = removeQuestion(room, index);
+    const result = await removeQuestion(index);
     if ("error" in result) return ack?.({ ok: false, error: result.error });
+    clearQuestionBag(room);
     broadcastRoom(io, room);
     ack?.({ ok: true, data: result });
   });

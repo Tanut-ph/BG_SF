@@ -21,7 +21,11 @@ import {
   type RoomSettings,
   type RoundSummary,
 } from "../shared/contracts";
-import { QUESTIONS } from "./questions";
+import {
+  getQuestions,
+  addQuestion as addQuestionDb,
+  removeQuestion as removeQuestionDb,
+} from "./db";
 
 export const DEFAULT_READING_SECONDS = 40;
 export const DEFAULT_DISCUSSION_SECONDS = 90;
@@ -65,7 +69,6 @@ export interface Room {
   deadline: number | null;
   reveal: RevealResult | null;
   settings: RoomSettings;
-  questions: Question[];
   questionBag: Question[]; // ถุงสุ่มแบบวน — หยิบจนหมดถุงก่อนเติมใหม่ (กันซ้ำเร็ว)
   history: RoundSummary[];
   scoreboard: Map<string, number>; // name -> คะแนนสะสมข้ามเกม
@@ -114,7 +117,7 @@ export function toPublicRoom(room: Room): PublicRoom {
     reveal: room.reveal,
     fishermanId: room.round ? playerIdByRole(room.round, "FISHERMAN") || null : null,
     settings: room.settings,
-    questionCount: room.questions.length,
+    questionCount: getQuestions().length,
     history: room.history,
     scoreboard: [...room.scoreboard.entries()]
       .map(([name, score]) => ({ name, score }))
@@ -157,7 +160,6 @@ export function createRoom(name: string, avatar: string, socketId: string) {
     deadline: null,
     reveal: null,
     settings: defaultSettings(),
-    questions: [...QUESTIONS],
     questionBag: [],
     history: [],
     scoreboard: new Map(),
@@ -328,7 +330,7 @@ export function connectedCount(room: Room): number {
  */
 function nextQuestion(room: Room, exclude: string[] = []): Question {
   const ex = new Set(exclude);
-  const pool = room.questions.length > 0 ? room.questions : QUESTIONS;
+  const pool = getQuestions();
   for (let attempt = 0; attempt < 2; attempt++) {
     if (room.questionBag.length === 0) room.questionBag = shuffle([...pool]);
     const idx = room.questionBag.findIndex((q) => !ex.has(q.prompt));
@@ -515,21 +517,31 @@ export function updateSettings(room: Room, partial: Partial<RoomSettings>): void
   }
 }
 
-export function addQuestion(room: Room, prompt: unknown, answer: unknown): Question[] | { error: string } {
+/** ล้างถุงสุ่มของห้อง — ให้หยิบคำถามใหม่จากคลังกลางล่าสุด (เรียกหลังแก้คลัง) */
+export function clearQuestionBag(room: Room): void {
+  room.questionBag = [];
+}
+
+/** เพิ่มคำถามเข้าคลังกลาง (มีผลทุกห้อง + persist ลง DB) — คืนคลังล่าสุด */
+export async function addQuestion(
+  prompt: unknown,
+  answer: unknown
+): Promise<Question[] | { error: string }> {
   const p = typeof prompt === "string" ? prompt.trim() : "";
   const a = typeof answer === "string" ? answer.trim() : "";
   if (!p || !a) return { error: "ต้องมีทั้งคำถามและคำตอบ" };
-  room.questions.push({ prompt: p.slice(0, 200), answer: a.slice(0, 200) });
-  room.questionBag = []; // เติมถุงใหม่จากคลังล่าสุด
-  return room.questions;
+  const ok = await addQuestionDb(p.slice(0, 200), a.slice(0, 200));
+  if (!ok) return { error: "มีคำถามนี้อยู่แล้ว" };
+  return getQuestions();
 }
 
-export function removeQuestion(room: Room, index: number): Question[] | { error: string } {
-  if (index < 0 || index >= room.questions.length) return { error: "ไม่พบคำถาม" };
-  if (room.questions.length <= 1) return { error: "ต้องมีคำถามอย่างน้อย 1 ข้อ" };
-  room.questions.splice(index, 1);
-  room.questionBag = []; // เติมถุงใหม่จากคลังล่าสุด
-  return room.questions;
+/** ลบคำถามออกจากคลังกลางด้วย index (มีผลทุกห้อง + persist ลง DB) — คืนคลังล่าสุด */
+export async function removeQuestion(index: number): Promise<Question[] | { error: string }> {
+  const list = getQuestions();
+  if (index < 0 || index >= list.length) return { error: "ไม่พบคำถาม" };
+  if (list.length <= 1) return { error: "ต้องมีคำถามอย่างน้อย 1 ข้อ" };
+  await removeQuestionDb(list[index].prompt);
+  return getQuestions();
 }
 
 /** ผู้เล่นคนนี้เป็นชาวประมงของรอบปัจจุบันหรือไม่ */
