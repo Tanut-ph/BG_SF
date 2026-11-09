@@ -21,7 +21,8 @@ Production build + server ทดสอบผ่านแล้ว (`npm run buil
    (หรือ **New → Web Service** ตั้งเอง: Runtime Node, Build `npm ci --include=dev && npm run build`, Start `npm run start`, Plan Free)
 4. ตอน deploy จะให้กรอก **Environment Variable** ที่ตั้ง `sync: false` ไว้:
    - `MONGODB_URI` = สตริงจาก Atlas — บน Render ใช้แบบ `mongodb+srv://...` ได้เลย (DNS ปกติ):
-     `mongodb+srv://oam23636_db_user:<password>@soundfish.s9lbwfu.mongodb.net/?appName=Soundfish`
+     `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?appName=<app>`
+     (เอาค่าจริงจาก Atlas → Connect → Drivers; อย่า commit ค่าจริงลง repo)
    - `MONGODB_DB` = `popbaek` (ตั้งไว้ใน render.yaml แล้ว)
    - ถ้าไม่ใส่ `MONGODB_URI` แอปยังรันได้ (in-memory) แค่ไม่กันซ้ำข้ามเครื่อง
 5. **Atlas Network Access** ต้องเปิด `0.0.0.0/0` (อนุญาตทุก IP) เพราะ IP ของ Render ไม่คงที่
