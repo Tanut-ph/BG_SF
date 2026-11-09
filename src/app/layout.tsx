@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Mitr, IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
+import PWARegister from "./PWARegister";
 
 const mitr = Mitr({
   subsets: ["thai", "latin"],
@@ -19,6 +20,13 @@ const plexThai = IBM_Plex_Sans_Thai({
 export const metadata: Metadata = {
   title: "โป๊ะแตก",
   description: "เกมจับโกหกวงเพื่อน — เล่นต่อหน้ากัน ใช้มือถือเป็นตัวช่วย",
+  manifest: "/manifest.webmanifest",
+  applicationName: "โป๊ะแตก",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "โป๊ะแตก" },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-180.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -26,6 +34,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -35,7 +44,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="th" className={`${mitr.variable} ${plexThai.variable}`}>
-      <body>{children}</body>
+      <body>
+        <PWARegister />
+        {children}
+      </body>
     </html>
   );
 }
